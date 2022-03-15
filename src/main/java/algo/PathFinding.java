@@ -24,6 +24,55 @@ public class PathFinding {
     @Context
     public Transaction tx;
 
+    //region Simple Paths - Nodes - Filtered by longs
+    private PathExpander<Double> buildPathExpanderForNodesLongs(String relationshipsAndDirections, String propertyName, long min, long max) {
+        PathExpanderBuilder builder = PathExpanderBuilder.empty();
+        builder.addNodeFilter(node -> ((long) node.getProperty(propertyName)) >= min && ((long) node.getProperty(propertyName)) <= max);
+
+        for (Pair<RelationshipType, Direction> pair : RelationshipTypeAndDirections
+                .parse(relationshipsAndDirections)) {
+            if (pair.first() == null) {
+                if (pair.other() == null) {
+                    builder = PathExpanderBuilder.allTypesAndDirections();
+                } else {
+                    builder = PathExpanderBuilder.allTypes(pair.other());
+                }
+            } else {
+                if (pair.other() == null) {
+                    builder = builder.add(pair.first());
+                } else {
+                    builder = builder.add(pair.first(), pair.other());
+                }
+            }
+        }
+        return builder.build();
+    }
+
+    @Procedure
+    @Description("algo.allSimplePathsFilteredByNode(startNode, endNode, 'KNOWS|<WORKS_WITH|IS_MANAGER_OF>', 5, propertyName, min, max) YIELD path, " +
+            "weight - run allSimplePaths with relationships given and maxNodes")
+    public Stream<PathResult> allSimplePathsFilteredByNode(
+            @Name("startNode") Node startNode,
+            @Name("endNode") Node endNode,
+            @Name("relationshipTypesAndDirections") String relTypesAndDirs,
+            @Name("maxNodes") long maxNodes,
+            @Name("propertyName") String propertyName,
+            @Name("minValue") long minValue,
+            @Name("maxValue") long maxValue) {
+
+        PathFinder<Path> algo = GraphAlgoFactory.allSimplePaths(
+                new BasicEvaluationContext(tx, db),
+                buildPathExpanderLongs(relTypesAndDirs, propertyName, minValue, maxValue),
+                (int) maxNodes
+        );
+        Iterable<Path> allPaths = algo.findAllPaths(startNode, endNode);
+        return StreamSupport.stream(allPaths.spliterator(), false)
+                .map(PathResult::new);
+    }
+
+    //endregion Simple Paths - Nodes - Filtered by longs
+
+    //region Simple Paths - Relationships - Filtered by longs
     private PathExpander<Double> buildPathExpanderLongs(String relationshipsAndDirections, String propertyName, long min, long max) {
         PathExpanderBuilder builder = PathExpanderBuilder.empty();
         for (Pair<RelationshipType, Direction> pair : RelationshipTypeAndDirections
@@ -46,8 +95,8 @@ public class PathFinding {
                 } else {
                     builder = builder.add(pair.first(), pair.other())
                             .addRelationshipFilter(relationship ->
-                            ((long) relationship.getProperty(propertyName)) >= min && ((long) relationship.getProperty(propertyName)) <= max
-                    );
+                                    ((long) relationship.getProperty(propertyName)) >= min && ((long) relationship.getProperty(propertyName)) <= max
+                            );
                 }
             }
         }
@@ -75,7 +124,9 @@ public class PathFinding {
         return StreamSupport.stream(allPaths.spliterator(), false)
                 .map(PathResult::new);
     }
+    //endregion Simple Paths - Relationships - Filtered by longs
 
+    //region Simple Paths - Relationships - Filtered by DateTimes
     private PathExpander<Double> buildPathExpanderDateTimes(String relationshipsAndDirections, String propertyName, ZonedDateTime min, ZonedDateTime max) {
         PathExpanderBuilder builder = PathExpanderBuilder.empty();
         for (Pair<RelationshipType, Direction> pair : RelationshipTypeAndDirections
@@ -129,7 +180,8 @@ public class PathFinding {
         return StreamSupport.stream(allPaths.spliterator(), false)
                 .map(PathResult::new);
     }
-    
+
+    //endregion Simple Paths - Relationships - Filtered by DateTimes
 }
 
 
